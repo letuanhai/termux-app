@@ -2,9 +2,6 @@ package com.termux.shared.termux.settings.preferences;
 
 import android.content.Context;
 import android.util.TypedValue;
-import android.os.Build;
-import android.view.Display;
-import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -154,28 +151,13 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         MAX_FONTSIZE = sizes[2];
     }
 
-    private String getDisplayIdAsString() {
-        Context context = getContext();
-        Display display;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display = context.getDisplay();
-        } else {
-            display = ((WindowManager) context.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
-        }
-        int d = display.getDisplayId();
-        if (d == Display.DEFAULT_DISPLAY)
-            return "";
-        else
-            return Integer.toString(d);
-    }
-
     public int getFontSize() {
-        int fontSize = SharedPreferenceUtils.getIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_FONTSIZE + getDisplayIdAsString(), DEFAULT_FONTSIZE);
+        int fontSize = SharedPreferenceUtils.getIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_FONTSIZE + getDisplayIdSuffix(), DEFAULT_FONTSIZE);
         return DataUtils.clamp(fontSize, MIN_FONTSIZE, MAX_FONTSIZE);
     }
 
     public void setFontSize(int value) {
-        SharedPreferenceUtils.setIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_FONTSIZE + getDisplayIdAsString(), value, false);
+        SharedPreferenceUtils.setIntStoredAsString(mSharedPreferences, TERMUX_APP.KEY_FONTSIZE + getDisplayIdSuffix(), value, false);
     }
 
     public void changeFontSize(boolean increase) {

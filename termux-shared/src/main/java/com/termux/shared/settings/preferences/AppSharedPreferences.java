@@ -2,6 +2,9 @@ package com.termux.shared.settings.preferences;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
+import android.view.Display;
+import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -44,6 +47,32 @@ public class AppSharedPreferences {
     /** Get {@link #mMultiProcessSharedPreferences}. */
     public SharedPreferences getMultiProcessSharedPreferences() {
         return mMultiProcessSharedPreferences;
+    }
+
+    /**
+     * Get a suffix for preference keys whose value should be stored per display, like the font size,
+     * so that a secondary display like Samsung DeX keeps its own value. Returns an empty string for
+     * {@link Display#DEFAULT_DISPLAY} so that existing keys of the primary display are preserved.
+     *
+     * The display is the one {@link #mContext} is associated with. A context that is not associated
+     * with a display, like an application or service context, is treated as the default display.
+     */
+    protected String getDisplayIdSuffix() {
+        Display display;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                display = mContext.getDisplay();
+            else
+                display = ((WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE)).getDefaultDisplay();
+        } catch (Exception e) {
+            // Context.getDisplay() throws UnsupportedOperationException for non-UI contexts.
+            return "";
+        }
+
+        if (display == null || display.getDisplayId() == Display.DEFAULT_DISPLAY)
+            return "";
+        else
+            return Integer.toString(display.getDisplayId());
     }
 
 }
