@@ -389,6 +389,11 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         mTermuxService = ((TermuxService.LocalBinder) service).service;
 
+        // The terminal colors loaded in onCreate() could not be applied to the already running
+        // sessions since the service was not bound yet, so apply them now
+        if (mTermuxTerminalSessionActivityClient != null)
+            mTermuxTerminalSessionActivityClient.checkForNightModeChange();
+
         setTermuxSessionsListView();
 
         final Intent intent = getIntent();
@@ -917,6 +922,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private void registerTermuxActivityBroadcastReceiver() {
         IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(Intent.ACTION_CONFIGURATION_CHANGED);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_RELOAD_STYLE);
         intentFilter.addAction(TERMUX_ACTIVITY.ACTION_REQUEST_PERMISSIONS);
@@ -947,6 +953,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 fixTermuxActivityBroadcastReceiverIntent(intent);
 
                 switch (intent.getAction()) {
+                    case Intent.ACTION_CONFIGURATION_CHANGED:
+                        // The system day/night mode may have changed, which does not necessarily
+                        // recreate the activity, so reload the terminal colors if needed. This is
+                        // posted since the AppCompatDelegate has not applied the new mode to the
+                        // activity configuration yet while the broadcast is being received.
+                        if (mTermuxTerminalSessionActivityClient != null)
+                            mTerminalView.post(() -> mTermuxTerminalSessionActivityClient.checkForNightModeChange());
+                        return;
                     case TERMUX_ACTIVITY.ACTION_NOTIFY_APP_CRASH:
                         Logger.logDebug(LOG_TAG, "Received intent to notify app crash");
                         TermuxCrashUtils.notifyAppCrashFromCrashLogFile(context, LOG_TAG);

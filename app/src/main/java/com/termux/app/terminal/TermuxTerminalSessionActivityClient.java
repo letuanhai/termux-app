@@ -27,6 +27,8 @@ import com.termux.app.TermuxService;
 import com.termux.shared.termux.settings.properties.TermuxPropertyConstants;
 import com.termux.shared.termux.terminal.io.BellHandler;
 import com.termux.shared.logger.Logger;
+import com.termux.shared.theme.NightMode;
+import com.termux.shared.theme.ThemeUtils;
 import com.termux.terminal.TerminalColors;
 import com.termux.terminal.TerminalSession;
 import com.termux.terminal.TerminalSessionClient;
@@ -41,6 +43,10 @@ import java.util.Properties;
 public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionClientBase {
 
     private final TermuxActivity mActivity;
+
+    /** The night mode the terminal colors currently loaded in {@link TerminalColors#COLOR_SCHEME} were
+     * loaded for, or {@code null} if they have not been loaded yet. */
+    private Boolean mNightModeOfLoadedColors;
 
     private static final int MAX_SESSIONS = 8;
 
@@ -74,6 +80,11 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             termuxSessionListNotifyUpdated();
         }
 
+        // The system day/night mode may have been changed while being away without the activity
+        // being recreated, in which case no ACTION_CONFIGURATION_CHANGED was received since the
+        // receiver is only registered while the activity is started.
+        checkForNightModeChange();
+
         // The current terminal session may have changed while being away, force
         // a refresh of the displayed terminal.
         mActivity.getTerminalView().onScreenUpdated();
@@ -83,6 +94,10 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
      * Should be called when mActivity.onResume() is called
      */
     public void onResume() {
+        // The day/night mode may have changed without the activity being recreated or stopped, like
+        // when it is toggled from the quick settings tile while the activity is in the foreground
+        checkForNightModeChange();
+
         // Just initialize the mBellSoundPool and load the sound, otherwise bell might not run
         // the first time bell key is pressed and play() is called, since sound may not be loaded
         // quickly enough before the call to play(). https://stackoverflow.com/questions/35435625
@@ -491,9 +506,52 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     }
 
 
+    /**
+     * Whether a dark terminal color scheme should be used. This is {@link NightMode#getAppNightMode()},
+     * so `night-mode=true|false` in `termux.properties` overrides the system setting, like for the
+     * app theme, and only `night-mode=system` follows the system.
+     *
+     * The activity configuration is used, which is the same one the app theme and the session list
+     * view resolve their day/night colors from, so that the terminal cannot disagree with the rest
+     * of the ui. It is maintained by {@link androidx.appcompat.app.AppCompatDelegate}, so it must
+     * only be read once the delegate has applied the new mode, which is why the reload is done from
+     * the activity lifecycle callbacks and not directly when the configuration change is received.
+     */
+    private boolean isNightModeEnabled() {
+        return ThemeUtils.shouldEnableDarkTheme(mActivity,
+            NightMode.getAppNightMode().getName());
+    }
+
+    /**
+     * Get the colors.properties file to load the terminal color scheme from. If the user has created
+     * a `colors-dark.properties` or `colors-light.properties` file, then the one matching
+     * {@code nightMode} is used, so that the terminal follows the day/night theme. Otherwise the
+     * normal `colors.properties` file is used.
+     */
+    private File getColorsFile(boolean nightMode) {
+        File colorsFile = nightMode ?
+            TermuxConstants.TERMUX_COLOR_DARK_PROPERTIES_FILE :
+            TermuxConstants.TERMUX_COLOR_LIGHT_PROPERTIES_FILE;
+        return colorsFile.isFile() ? colorsFile : TermuxConstants.TERMUX_COLOR_PROPERTIES_FILE;
+    }
+
+    /**
+     * Reload the terminal colors if the day/night mode changed since they were last loaded, like
+     * when the system dark mode is toggled while the activity is running. The activity is not
+     * necessarily recreated on a ui mode change, so this cannot be left to {@link #onCreate()}.
+     *
+     * This also reloads if the colors could not be applied to the existing sessions yet because
+     * the service was not bound, which is the case when called from {@link #onCreate()}.
+     */
+    public void checkForNightModeChange() {
+        if (mNightModeOfLoadedColors == null || mNightModeOfLoadedColors != isNightModeEnabled())
+            checkForFontAndColors();
+    }
+
     public void checkForFontAndColors() {
         try {
-            File colorsFile = TermuxConstants.TERMUX_COLOR_PROPERTIES_FILE;
+            boolean nightMode = isNightModeEnabled();
+            File colorsFile = getColorsFile(nightMode);
             File fontFile = TermuxConstants.TERMUX_FONT_FILE;
 
             final Properties props = new Properties();
@@ -504,14 +562,34 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             }
 
             TerminalColors.COLOR_SCHEME.updateWith(props);
-            TerminalSession session = mActivity.getCurrentSession();
-            if (session != null && session.getEmulator() != null) {
-                session.getEmulator().mColors.reset();
+
+            Logger.logDebug(LOG_TAG, "Loaded terminal colors from \"" + colorsFile.getAbsolutePath() +
+                "\" for night mode \"" + nightMode + "\"");
+
+            // Reset the colors of all sessions and not just the current one, so that background
+            // sessions do not keep the colors of the previous scheme when switched to
+            TermuxService service = mActivity.getTermuxService();
+            if (service != null) {
+                for (TermuxSession termuxSession : service.getTermuxSessions()) {
+                    TerminalSession session = termuxSession.getTerminalSession();
+                    if (session != null && session.getEmulator() != null)
+                        session.getEmulator().mColors.reset();
+                }
             }
+
             updateBackgroundColor();
 
             final Typeface newTypeface = (fontFile.exists() && fontFile.length() > 0) ? Typeface.createFromFile(fontFile) : Typeface.MONOSPACE;
             mActivity.getTerminalView().setTypeface(newTypeface);
+
+            // Redraw with the new colors, otherwise the terminal keeps showing the old ones until
+            // the session next outputs something
+            mActivity.getTerminalView().invalidate();
+
+            // Only remember the night mode if the sessions could actually be reset, since the
+            // service is not bound yet when called from onCreate(), in which case the existing
+            // sessions must be reset again once it connects in TermuxActivity.onServiceConnected()
+            mNightModeOfLoadedColors = service != null ? nightMode : null;
         } catch (Exception e) {
             Logger.logStackTraceWithMessage(LOG_TAG, "Error in checkForFontAndColors()", e);
         }

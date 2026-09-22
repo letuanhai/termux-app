@@ -334,7 +334,15 @@ public final class TermuxPropertyConstants {
 
 
 
-    /** Defines the key for {@link NightMode}. */
+    /**
+     * Defines the key for {@link NightMode}.
+     *
+     * Valid values are `true` (always dark), `false` (always light) and `system` (follow the system
+     * dark mode, the default). This sets the app theme, and additionally selects the terminal color
+     * scheme if the user has created a `~/.termux/colors-dark.properties` or
+     * `~/.termux/colors-light.properties` file, which are used instead of `colors.properties` for
+     * dark and light mode respectively.
+     */
     public static final String KEY_NIGHT_MODE = "night-mode"; // Default: "night-mode"
 
     public static final String IVALUE_NIGHT_MODE_TRUE = NightMode.TRUE.getName();

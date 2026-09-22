@@ -767,6 +767,18 @@ public final class TermuxConstants {
     /** Termux app and Termux:Styling colors.properties file */
     public static final File TERMUX_COLOR_PROPERTIES_FILE = new File(TERMUX_COLOR_PROPERTIES_FILE_PATH);
 
+    /** Termux app colors-dark.properties file path, used instead of {@link #TERMUX_COLOR_PROPERTIES_FILE_PATH} if it
+     * exists and night mode is enabled */
+    public static final String TERMUX_COLOR_DARK_PROPERTIES_FILE_PATH = TERMUX_DATA_HOME_DIR_PATH + "/colors-dark.properties"; // Default: "/data/data/com.termux/files/home/.termux/colors-dark.properties"
+    /** Termux app colors-dark.properties file */
+    public static final File TERMUX_COLOR_DARK_PROPERTIES_FILE = new File(TERMUX_COLOR_DARK_PROPERTIES_FILE_PATH);
+
+    /** Termux app colors-light.properties file path, used instead of {@link #TERMUX_COLOR_PROPERTIES_FILE_PATH} if it
+     * exists and night mode is disabled */
+    public static final String TERMUX_COLOR_LIGHT_PROPERTIES_FILE_PATH = TERMUX_DATA_HOME_DIR_PATH + "/colors-light.properties"; // Default: "/data/data/com.termux/files/home/.termux/colors-light.properties"
+    /** Termux app colors-light.properties file */
+    public static final File TERMUX_COLOR_LIGHT_PROPERTIES_FILE = new File(TERMUX_COLOR_LIGHT_PROPERTIES_FILE_PATH);
+
     /** Termux app and Termux:Styling font.ttf file path */
     public static final String TERMUX_FONT_FILE_PATH = TERMUX_DATA_HOME_DIR_PATH + "/font.ttf"; // Default: "/data/data/com.termux/files/home/.termux/font.ttf"
     /** Termux app and Termux:Styling font.ttf file */
